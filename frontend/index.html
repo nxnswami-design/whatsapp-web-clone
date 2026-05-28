@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Web Clone - Real-Time Messaging</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #888 #f1f1f1;
+    }
+
+    *::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* Dark mode scrollbar */
+    .dark *::-webkit-scrollbar-track {
+      background: #2d3748;
+    }
+
+    .dark *::-webkit-scrollbar-thumb {
+      background: #4a5568;
+    }
+
+    .dark *::-webkit-scrollbar-thumb:hover {
+      background: #718096;
+    }
+
+    /* Animation for new messages */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-enter {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    /* Pulse animation for unread badge */
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .badge-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Chat bubble animations */
+    .chat-bubble {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    /* Smooth transitions */
+    .transition-all {
+      transition: all 0.3s ease;
+    }
+
+    /* Custom styles for message timestamps */
+    .message-time {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    /* Loading animation */
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    .shimmer {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+    }
+
+    .dark .shimmer {
+      background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% {
+        opacity: 0.5;
+      }
+      30% {
+        opacity: 1;
+      }
+    }
+
+    /* Responsive chat layout */
+    @media (max-width: 768px) {
+      .sidebar-hidden {
+        display: none;
+      }
+
+      .chat-window-hidden {
+        display: none;
+      }
+
+      .chat-active .sidebar-hidden {
+        display: none;
+      }
+
+      .chat-active .chat-window-hidden {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 h-screen overflow-hidden">
+  <div class="flex h-full">
+    <!-- LEFT SIDEBAR (30%) -->
+    <aside id="sidebar" class="sidebar-hidden md:flex w-full md:w-3/10 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+      <!-- Header with Profile & Theme Toggle -->
+      <header class="bg-gradient-to-r from-green-500 to-teal-500 dark:from-green-600 dark:to-teal-600 text-white p-4 flex items-center justify-between border-b border-green-600 dark:border-green-700">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-white dark:bg-gray-200 flex items-center justify-center overflow-hidden">
+            <img id="user-avatar" src="https://via.placeholder.com/40" alt="Profile" class="w-full h-full object-cover">
+          </div>
+          <div>
+            <p id="user-name" class="font-semibold text-sm">Loading...</p>
+            <p class="text-xs opacity-90">Online</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="theme-toggle" class="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all" title="Toggle Dark Mode">
+            <svg class="w-5 h-5 hidden dark:block" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+            </svg>
+            <svg class="w-5 h-5 block dark:hidden" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zM4.22 4.22a1 1 0 011.414 0l.707.707a1 1 0 00-1.414-1.414l-.707.707zm11.314 0a1 1 0 000 1.414l.707.707a1 1 0 101.414-1.414l-.707-.707zM4 10a1 1 0 110-2 1 1 0 010 2zm12 0a1 1 0 110-2 1 1 0 010 2zm3.78 4.22a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zm-2.828 2.828a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM10 15a1 1 0 110 2 1 1 0 010-2z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+          <button id="logout-btn" class="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all" title="Logout">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Search Bar -->
+      <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search or start a new chat..."
+          class="w-full px-4 py-2 rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-sm"
+        >
+      </div>
+
+      <!-- Chat List -->
+      <nav id="chat-list" class="flex-1 overflow-y-auto">
+        <!-- Placeholder for loading state -->
+        <div id="chat-list-loader" class="space-y-3 p-4">
+          <div class="flex gap-3 animate-pulse">
+            <div class="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            </div>
+          </div>
+          <div class="flex gap-3 animate-pulse">
+            <div class="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Chat items will be injected here dynamically -->
+      </nav>
+
+      <!-- Quick Action Button -->
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+        <button id="new-chat-btn" class="w-full py-2 px-4 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          New Chat
+        </button>
+      </div>
+    </aside>
+
+    <!-- RIGHT CHAT WINDOW (70%) -->
+    <main id="chat-window" class="chat-window-hidden md:flex w-full md:w-7/10 flex-col bg-gray-50 dark:bg-gray-900 h-full relative">
+      <!-- No Chat Selected State -->
+      <div id="no-chat-selected" class="flex-1 flex flex-col items-center justify-center text-center p-8">
+        <div class="mb-6">
+          <svg class="w-32 h-32 mx-auto text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-600 dark:text-gray-400 mb-2">WhatsApp Web Clone</h2>
+        <p class="text-gray-500 dark:text-gray-500 mb-4 max-w-sm">Select a chat to start messaging or create a new conversation. Messages are end-to-end encrypted.</p>
+        <div class="flex gap-3 mt-6">
+          <button id="start-chat-btn" class="px-6 py-2 bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white rounded-lg font-semibold transition-all">
+            Start Chatting
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Active State (Hidden by default) -->
+      <div id="chat-active-container" class="hidden flex-1 flex flex-col h-full">
+        <!-- Chat Header -->
+        <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between sticky top-0 z-10">
+          <div class="flex items-center gap-3">
+            <button id="back-to-chats" class="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
+            <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img id="chat-recipient-avatar" src="https://via.placeholder.com/40" alt="Recipient" class="w-full h-full object-cover">
+            </div>
+            <div>
+              <h3 id="chat-recipient-name" class="font-semibold text-sm">Loading...</h3>
+              <p id="chat-recipient-status" class="text-xs text-gray-500 dark:text-gray-400">online</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all" title="Call">
+              <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773c.058.3.102.605.102.924v1.902c0 .319-.044.624-.102.924l1.548.773a1 1 0 01.54 1.06l-.74 4.435a1 1 0 01-.986.836H3a1 1 0 01-1-1V3z"></path>
+              </svg>
+            </button>
+            <button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all" title="Video Call">
+              <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"></path>
+              </svg>
+            </button>
+            <button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all" title="Info">
+              <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Messages Container -->
+        <div id="message-container" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
+          <!-- Messages will be injected here dynamically -->
+          <div id="messages-loader" class="space-y-4 animate-pulse">
+            <div class="flex gap-2">
+              <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
+              <div class="flex-1">
+                <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-2"></div>
+                <div class="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              </div>
+            </div>
+            <div class="flex gap-2 justify-end">
+              <div class="flex-1 flex justify-end">
+                <div class="w-3/4 space-y-2">
+                  <div class="h-3 bg-green-200 dark:bg-green-900 rounded w-1/3 ml-auto"></div>
+                  <div class="h-8 bg-green-200 dark:bg-green-900 rounded"></div>
+                </div>
+              </div>
+              <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Typing Indicator (hidden by default) -->
+        <div id="typing-indicator" class="hidden px-4 py-2 text-gray-600 dark:text-gray-400 text-sm">
+          <div class="typing-indicator">
+            <span id="typing-name">User</span> is typing
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+
+        <!-- Message Input Area -->
+        <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex items-end gap-3">
+          <button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all flex-shrink-0" title="Emoji">
+            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm6 0a1 1 0 100-2 1 1 0 000 2zm.22 4.78a.75.75 0 00-1.06-1.06 3.5 3.5 0 01-4.88 0 .75.75 0 00-1.06 1.06 5 5 0 007.07 0z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+          <button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all flex-shrink-0" title="Attach File">
+            <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.3A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z"></path>
+            </svg>
+          </button>
+          <input 
+            type="text" 
+            id="message-input" 
+            placeholder="Type a message..."
+            class="flex-1 px-4 py-2 rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-sm resize-none"
+            rows="1"
+          >
+          <button id="send-btn" class="p-2 hover:bg-green-100 dark:hover:bg-green-900 rounded-full transition-all flex-shrink-0 text-green-500 hover:text-green-600 dark:hover:text-green-400">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,-0.8429026 C3.34915502,-1.1 2.40734225,-0.9429026 1.77946707,0.39 C0.994623095,1.01 0.837654326,2.10 1.15159189,2.89 C3.03521743,9.331 3.34915502,11.4744748 3.50612381,12.6315722 L16.6915026,11.6889879 C16.6915026,11.6889879 17.1624089,11.6889879 17.1624089,12.0744748 C17.1624089,12.4599618 17.1624089,12.4744748 16.6915026,12.4744748 Z"></path>
+            </svg>
+          </button>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal for New Chat / Select User -->
+  <div id="new-chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold">New Chat</h2>
+          <button id="close-modal" class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="p-6">
+        <input 
+          type="text" 
+          id="modal-search-input" 
+          placeholder="Search users..."
+          class="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-sm mb-4"
+        >
+        <div id="modal-user-list" class="space-y-2 max-h-96 overflow-y-auto">
+          <!-- Users will be injected here dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentication Modal (shown on page load if not logged in) -->
+  <div id="auth-modal" class="fixed inset-0 bg-gradient-to-br from-green-500 to-teal-600 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full p-8">
+      <div class="text-center mb-8">
+        <div class="inline-block p-4 bg-green-100 dark:bg-green-900 rounded-full mb-4">
+          <svg class="w-8 h-8 text-green-600 dark:text-green-300" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">WhatsApp Web</h1>
+        <p class="text-gray-600 dark:text-gray-400">Real-Time Messaging Clone</p>
+      </div>
+
+      <div id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email</label>
+          <input 
+            type="email" 
+            id="login-email" 
+            placeholder="your@email.com"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Password</label>
+          <input 
+            type="password" 
+            id="login-password" 
+            placeholder="••••••••"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <button id="login-btn" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all">
+          Login
+        </button>
+        <div class="relative py-4">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-2 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400">or</span>
+          </div>
+        </div>
+        <button id="signup-toggle" type="button" class="w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-all">
+          Create Account
+        </button>
+      </div>
+
+      <div id="signup-form" class="hidden space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+          <input 
+            type="text" 
+            id="signup-name" 
+            placeholder="John Doe"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email</label>
+          <input 
+            type="email" 
+            id="signup-email" 
+            placeholder="your@email.com"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Password</label>
+          <input 
+            type="password" 
+            id="signup-password" 
+            placeholder="••••••••"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Confirm Password</label>
+          <input 
+            type="password" 
+            id="signup-confirm" 
+            placeholder="••••••••"
+            class="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+          >
+        </div>
+        <button id="signup-btn" class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all">
+          Create Account
+        </button>
+        <button id="login-toggle" type="button" class="w-full py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-all">
+          Back to Login
+        </button>
+      </div>
+
+      <div id="auth-error" class="hidden mt-4 p-3 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-200 rounded-lg text-sm"></div>
+      <div id="auth-success" class="hidden mt-4 p-3 bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-200 rounded-lg text-sm"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
